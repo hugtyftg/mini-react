@@ -3,7 +3,7 @@ const ReactDOM = {
   createRoot(container) {
     return {
       render(el) {
-        React.render(el, container);
+        React.renderPlus(el, container);
       },
     };
   },

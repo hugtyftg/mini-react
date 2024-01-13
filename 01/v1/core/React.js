@@ -43,6 +43,37 @@ function render(el, container) {
 }
 const React = {
   render,
+  renderPlus,
   createElement,
 };
 export default React;
+function renderPlus(el, container) {
+  // 根据type创建dom
+  const dom =
+    el.type === 'TEXT_ELEMENT'
+      ? document.createTextNode('')
+      : document.createElement(el.type);
+  // 给dom添加上除了children之外的属性
+  Reflect.ownKeys(el.props).forEach((key) => {
+    switch (key) {
+      // 处理样式obj
+      case 'style':
+        const styleObj = el.props.style;
+        Object.keys(styleObj).forEach((styleKey) => {
+          dom.style[styleKey] = styleObj[styleKey];
+        });
+        break;
+      // 递归处理children
+      case 'children':
+        el.props.children.forEach((child) => {
+          render(child, dom);
+        });
+        break;
+      // 其他属性直接添加即可
+      default:
+        dom[key] = el.props[key];
+        break;
+    }
+  });
+  container.append(dom);
+}
