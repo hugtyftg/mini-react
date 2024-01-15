@@ -42,62 +42,64 @@ function workLoop(idleDeadline) {
   }
   requestIdleCallback(workLoop);
 }
-// 处理函数组件，只有递归处理子节点这一个步骤
-function updateFunctionComponent(fiber) {
-  // 1.转换列表，设置指针
-  // 函数组件需要解构并转成数组
-  const children = [fiber.type(fiber.props)];
-  genChildrenQueue(fiber, children);
-}
-// 处理正常的元素，不仅会递归处理子节点，如果没有dom的时候还会新建dom并赋值属性
-function updateHostComponent(fiber) {
-  // 如果当前work没有dom，则进行下列三项操作（root有dom）
-  if (!fiber.dom) {
-    // 1.创建dom
-    fiber.dom = createDOMNode(fiber.type);
-
-    let fiberParent = fiber.parent;
-    // 对于非函数组件，一直向上找dom挂载
-    while (!fiberParent.dom) {
-      fiberParent = fiberParent.parent;
-    }
-    // function component fiber没有dom
-    if (fiber.dom) {
-      fiberParent.dom.append(fiber.dom);
-    }
-    // 2.设置属性
-    updateProps(fiber.dom, fiber.props);
-  }
-  // 3.转换列表，设置指针
-  // 非函数组件直接取值
-  const children = fiber.props.children;
-  genChildrenQueue(fiber, children);
-}
 function performWorkOfUnit(fiber) {
-  console.log(1);
-  // 判断是否为函数组件，fiber.type是个函数，返回一个dom
+  // 1.根据类型选择是否创建节点、创建怎样的节点
+  // 2.设置props
+  // 判断是否为函数组件，fiber.type结果是一个
   const isFunctionComponent = typeof fiber.type === 'function';
-  if (isFunctionComponent) {
-    console.log(fiber.type());
+  // 对于非函数组件才创建dom节点，但是这会造成一个问题，函数组件里面的dom会找不到parent.dom
+  if (!isFunctionComponent) {
+    // 如果当前work没有dom，则进行下列三项操作
+    if (!fiber.dom) {
+      // 创建dom
+      fiber.dom = createDOMNode(fiber.type);
+
+      let fiberParent = fiber.parent;
+      // 对于非函数组件，一直向上找dom挂载
+      while (!fiberParent.dom) {
+        fiberParent = fiberParent.parent;
+      }
+      // function component fiber没有dom
+      if (fiber.dom) {
+        fiberParent.dom.append(fiber.dom);
+      }
+
+      updateProps(fiber.dom, fiber.props);
+    }
   }
-  // 问题：对于非函数组件才创建dom节点，但是这会造成一个问题，函数组件里面的dom会找不到parent.dom
-  // 解决：向上一直找parent
-  if (isFunctionComponent) {
-    updateFunctionComponent(fiber);
-  } else {
-    updateHostComponent(fiber);
-  }
-  // 返回下一个要执行的任务
+
+  // 3.转换列表，设置指针
+  // 非函数组件直接取值，函数组件需要解构并转成数组
+  const children = isFunctionComponent
+    ? [fiber.type(fiber.props)]
+    : fiber.props.children;
+
+  genChildrenQueue(fiber, children);
+
+  // 4.返回下一个要执行的任务
   if (fiber.child) {
     return fiber.child;
   }
-  let nextFiber = fiber;
-  while (nextFiber) {
-    if (nextFiber.sibling) {
-      return nextFiber.sibling;
-    }
-    nextFiber = nextFiber.parent;
+  if (fiber.sibling) {
+    return fiber.sibling;
   }
+  // 向上一直查找直到返回下一个fiber
+  // 需要注意对于dom树的最后一个节点，fiberParent一直向上查找到root仍然需要查找root.parent
+  // 但是root只有child没有parent和sibling所以查找结果为undefined，fiberParent被更新成undefined
+  // 此时无需继续查，直接返回null标志着任务结束，全局的nextWorkOfUnit被重置为null
+  let fiberParent = fiber.parent;
+  while (fiberParent && !fiberParent?.sibling) {
+    fiberParent = fiberParent.parent;
+  }
+  return fiberParent ? fiberParent.sibling : null;
+  // 另一种思路
+  // let nextFiber = fiber;
+  // while (nextFiber) {
+  //   if (nextFiber.sibling) {
+  //     return nextFiber.sibling;
+  //   }
+  //   nextFiber = nextFiber.parent;
+  // }
 }
 // 根据类型创建dom节点
 function createDOMNode(type) {
