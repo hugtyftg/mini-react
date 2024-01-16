@@ -30,7 +30,9 @@ function render(el, container) {
       children: [el],
     },
   };
+  root = nextWorkOfUnit;
 }
+let root = null;
 let nextWorkOfUnit = null;
 function workLoop(idleDeadline) {
   let shouldYield = false;
@@ -40,7 +42,35 @@ function workLoop(idleDeadline) {
     nextWorkOfUnit = performWorkOfUnit(nextWorkOfUnit);
     shouldYield = idleDeadline.timeRemaining() < 1;
   }
+  if (!nextWorkOfUnit && root) {
+  }
   requestIdleCallback(workLoop);
+}
+
+function performWorkOfUnit(fiber) {
+  // 判断是否为函数组件，fiber.type是个函数，返回一个dom
+  const isFunctionComponent = typeof fiber.type === 'function';
+  if (isFunctionComponent) {
+    console.log(fiber.type());
+  }
+  // 问题：对于非函数组件才创建dom节点，但是这会造成一个问题，函数组件里面的dom会找不到parent.dom
+  // 解决：向上一直找parent
+  if (isFunctionComponent) {
+    updateFunctionComponent(fiber);
+  } else {
+    updateHostComponent(fiber);
+  }
+  // 返回下一个要执行的任务
+  if (fiber.child) {
+    return fiber.child;
+  }
+  let nextFiber = fiber;
+  while (nextFiber) {
+    if (nextFiber.sibling) {
+      return nextFiber.sibling;
+    }
+    nextFiber = nextFiber.parent;
+  }
 }
 // 处理函数组件，只有递归处理子节点这一个步骤
 function updateFunctionComponent(fiber) {
@@ -72,32 +102,6 @@ function updateHostComponent(fiber) {
   // 非函数组件直接取值
   const children = fiber.props.children;
   genChildrenQueue(fiber, children);
-}
-function performWorkOfUnit(fiber) {
-  console.log(1);
-  // 判断是否为函数组件，fiber.type是个函数，返回一个dom
-  const isFunctionComponent = typeof fiber.type === 'function';
-  if (isFunctionComponent) {
-    console.log(fiber.type());
-  }
-  // 问题：对于非函数组件才创建dom节点，但是这会造成一个问题，函数组件里面的dom会找不到parent.dom
-  // 解决：向上一直找parent
-  if (isFunctionComponent) {
-    updateFunctionComponent(fiber);
-  } else {
-    updateHostComponent(fiber);
-  }
-  // 返回下一个要执行的任务
-  if (fiber.child) {
-    return fiber.child;
-  }
-  let nextFiber = fiber;
-  while (nextFiber) {
-    if (nextFiber.sibling) {
-      return nextFiber.sibling;
-    }
-    nextFiber = nextFiber.parent;
-  }
 }
 // 根据类型创建dom节点
 function createDOMNode(type) {
@@ -154,7 +158,6 @@ function genChildrenQueue(fiber, children) {
   });
 }
 requestIdleCallback(workLoop);
-
 const React = {
   render,
   createElement,

@@ -3,13 +3,13 @@
 // 1.配置Babel plugin options
 // 2.手动在每个模块开头添加jsx pragma comment
 /**@jsx CReact.createElement */
-import CReact from './core/React（重构前）.js';
+import CReact from './core/React.js';
 function Count({ num }) {
-  return <div>Count: {num}</div>;
+  return <div className="count">Count: {num}</div>;
 }
 function CountContainer() {
   return (
-    <div>
+    <div className="count-container">
       Container Content:
       <Count num={10} />
       <Count num={20} />
@@ -18,7 +18,7 @@ function CountContainer() {
 }
 const App = () => {
   return (
-    <div>
+    <div className="app">
       hi mini react
       <CountContainer />
     </div>
