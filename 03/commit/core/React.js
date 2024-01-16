@@ -115,11 +115,8 @@ function updateProps(dom, props) {
           dom.style[styleKey] = styleObj[styleKey];
         });
         break;
-      // 递归处理children
+      // 不用再递归处理children
       case 'children':
-        props.children.forEach((child) => {
-          render(child, dom);
-        });
         break;
       // 其他属性直接添加即可
       default:
