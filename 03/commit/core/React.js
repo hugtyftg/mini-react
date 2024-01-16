@@ -33,7 +33,6 @@ function render(el, container) {
   };
   // 将root指向根fiber
   root = nextWorkOfUnit;
-  console.log(root);
 }
 // 要渲染的DOM树的根节点的指针
 let root = null;
