@@ -5,10 +5,21 @@ import React from './core/React';
 //   { class: 'app', style: { color: 'red' } },
 //   'this is app div'
 // );
+function Count({ num }) {
+  return (
+    <div className="count" style={{ color: 'blue' }}>
+      Count: {num}
+    </div>
+  );
+}
 // 自动识别jsx语法
-const App = (
-  <div className="app" style={{ color: 'red' }}>
-    this is app div
-  </div>
-);
+function App() {
+  return (
+    <div className="app" style={{ color: 'red' }}>
+      this is app div
+      <Count num={10} />
+      <Count num={20} />
+    </div>
+  );
+}
 export default App;
