@@ -1,3 +1,6 @@
+// 根容器真实DOM节点
+let rootContainerDOM = null;
+// 指向根容器对应的链表节点的指针
 let root = null;
 let nextWorkOfUnit = null;
 // 主入口
@@ -9,6 +12,7 @@ function render(el, container) {
       children: [el],
     },
   };
+  rootContainerDOM = container;
   root = nextWorkOfUnit;
   requestIdleCallback(workLoop);
 }
@@ -132,8 +136,9 @@ function updateProps(dom, props) {
         return;
       default:
         if (propKey.startsWith('on')) {
-          const eventName = propKey.toLowerCase().substring(2);
-          dom.addEventListener(eventName, props[propKey]);
+          const eventType = propKey.toLowerCase().substring(2);
+          dom.addEventListener(eventType, props[propKey]);
+          // handleSyntheticEvent(propKey);
         } else {
           dom[propKey] = props[propKey];
         }
@@ -141,9 +146,49 @@ function updateProps(dom, props) {
     }
   });
 }
+function handleSyntheticEvent(syntheticEventType) {
+  let isCapture;
+  let eventType = syntheticEventType.toLowerCase().substring(2);
+  if (syntheticEventType.endsWith('Capture')) {
+    eventType = eventType.substring(0, eventType.length - 7); // 事件名字去掉capture
+    isCapture = true;
+  }
+  if (isCapture) {
+    // 捕获阶段的绑定
+    rootContainerDOM.addEventListener(
+      eventType,
+      (e) => {
+        let path = e.composedPath();
+        [...path].reverse().forEach((ele) => {
+          let handler = ele.props[syntheticEventType];
+          if (handler) {
+            handler(e);
+          }
+        });
+      },
+      true
+    );
+  } else {
+    // 冒泡阶段的绑定
+    rootContainerDOM.addEventListener(
+      eventType,
+      (e) => {
+        let path = e.composedPath();
+        [...path].forEach((ele) => {
+          console.log(ele);
+
+          let handler = ele.props[syntheticEventType];
+          if (handler) {
+            handler(e);
+          }
+        });
+      },
+      false
+    );
+  }
+}
 // 将DOM树按照前序遍历的顺序组织成链表
 function initChildren(fiber, children) {
-  console.log(fiber);
   let prevChild = null;
   children.forEach((child, index) => {
     const newFiber = {
