@@ -24,13 +24,6 @@ function update() {
   // 使用闭包暂时存储要改变的fiber
   let currentFiber = wipFiber;
   return () => {
-    console.log(currentFiber);
-    // // 创建新root
-    // wipRoot = {
-    //   dom: currentRoot.dom,
-    //   props: currentRoot.props,
-    //   alternate: currentRoot,
-    // };
     // 更新开始的地方
     wipRoot = {
       ...currentFiber,
@@ -76,7 +69,7 @@ function workLoop(deadline) {
   while (!shouldYield && nextWorkOfUnit) {
     nextWorkOfUnit = performWorkOfUnit(nextWorkOfUnit);
 
-    // 在更新阶段，wipRoot是更新的开始点，只需要判断下一个任务片是否是wipRoot的兄弟即可
+    // 在更新阶段，wipRoot是更新的开始点
     // 如果是，则更新停止
     // 需要考虑的是这些值可能为undefined，防止报错需要添加可选链
     if (wipRoot?.sibling?.type === nextWorkOfUnit?.type) {
