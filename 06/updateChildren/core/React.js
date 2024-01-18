@@ -96,7 +96,6 @@ function commitDeletion(fiber) {
 function commitWork(fiber) {
   // 终止条件
   if (!fiber) return;
-
   // 执行任务
   // 添加节点
   let fiberParent = fiber.parent;
@@ -238,6 +237,11 @@ function reconcileChildren(fiber, children) {
     }
     prevChild = newFiber;
   });
+  // 遍历一遍新DOM树之后再检查一遍，老的DOM树上是否还有fiber，如果有，说明这是老的children多余的若干个节点，需要移除
+  while (oldFiberChild) {
+    deletions.push(oldFiberChild);
+    oldFiberChild = oldFiberChild.sibling;
+  }
 }
 
 function handleSyntheticEvent(syntheticEventType) {

@@ -1,8 +1,14 @@
 import React from './core/React';
 let showBar = false;
 function Counter() {
-  const foo = <div>foo</div>;
-  const bar = <p>bar</p>;
+  const foo = (
+    <div>
+      foo
+      <div>child1</div>
+      <div>child2</div>
+    </div>
+  );
+  const bar = <div>bar</div>;
   function handleShowbar() {
     showBar = !showBar;
     React.update();
