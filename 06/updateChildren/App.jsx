@@ -1,32 +1,51 @@
 import React from './core/React';
-let showBar = false;
-function Counter() {
-  const foo = (
-    <div>
-      foo
-      <div>child1</div>
-      <div>child2</div>
-    </div>
-  );
-  const bar = <div>bar</div>;
-  function handleShowbar() {
-    showBar = !showBar;
-    React.update();
+let countFoo = 1;
+function Foo() {
+  console.log('foo run');
+  const update = React.update();
+  function handleClick() {
+    countFoo++;
+    update();
   }
   return (
     <div>
-      Counter
-      {showBar && bar}
-      <button onClick={handleShowbar}>showBar</button>
+      <h1>Foo</h1>
+      {countFoo}
+      <button onClick={handleClick}>click</button>
     </div>
   );
 }
+let countBar = 1;
+function Bar() {
+  console.log('bar run');
+  const update = React.update();
+  function handleClick() {
+    countBar++;
+    update();
+  }
+  return (
+    <div>
+      <h1>Bar</h1>
+      {countBar}
+      <button onClick={handleClick}>click</button>
+    </div>
+  );
+}
+let countRoot = 1;
 // 自动识别jsx语法
 function App() {
+  console.log('app run');
+  const update = React.update();
+  function handleClick() {
+    countRoot++;
+    update();
+  }
   return (
-    <div className="app" style={{ color: 'red' }}>
-      hi mini react
-      <Counter />
+    <div>
+      hi-mini-react count: {countRoot}
+      <button onClick={handleClick}>click</button>
+      <Foo />
+      <Bar />
     </div>
   );
 }

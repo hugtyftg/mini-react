@@ -5,6 +5,8 @@ let wipRoot = null;
 let nextWorkOfUnit = null;
 // 更新时候需要删除的节点
 let deletions = [];
+// 当前活动更新的fiber，也就是一个fc
+let wipFiber = null;
 // 开启循环监听浏览器空闲时间
 requestIdleCallback(workLoop);
 // 主入口
@@ -19,13 +21,23 @@ function render(el, container) {
 }
 // 暂时只考虑没有dom的增删，只有props的变化
 function update() {
-  // 创建新root
-  wipRoot = {
-    dom: currentRoot.dom,
-    props: currentRoot.props,
-    alternate: currentRoot,
+  // 使用闭包暂时存储要改变的fiber
+  let currentFiber = wipFiber;
+  return () => {
+    console.log(currentFiber);
+    // // 创建新root
+    // wipRoot = {
+    //   dom: currentRoot.dom,
+    //   props: currentRoot.props,
+    //   alternate: currentRoot,
+    // };
+    // 更新开始的地方
+    wipRoot = {
+      ...currentFiber,
+      alternate: currentFiber,
+    };
+    nextWorkOfUnit = wipRoot;
   };
-  nextWorkOfUnit = wipRoot;
 }
 // 创建virtual dom
 function createElement(type, props, ...children) {
@@ -63,11 +75,17 @@ function workLoop(deadline) {
   let shouldYield = false;
   while (!shouldYield && nextWorkOfUnit) {
     nextWorkOfUnit = performWorkOfUnit(nextWorkOfUnit);
+
+    // 在更新阶段，wipRoot是更新的开始点，只需要判断下一个任务片是否是wipRoot的兄弟即可
+    // 如果是，则更新停止
+    // 需要考虑的是这些值可能为undefined，防止报错需要添加可选链
+    if (wipRoot?.sibling?.type === nextWorkOfUnit?.type) {
+      nextWorkOfUnit = undefined;
+    }
     shouldYield = deadline.timeRemaining() < 1;
   }
   if (wipRoot && !nextWorkOfUnit) {
     commitRoot();
-    console.log('finished');
   }
   requestIdleCallback(workLoop);
 }
@@ -140,6 +158,8 @@ function performWorkOfUnit(fiber) {
 }
 // 处理函数组件
 function handleFunctionComponent(fiber) {
+  // 存储将来要更新的FC fiber
+  wipFiber = fiber;
   const children = [fiber.type(fiber.props)];
   reconcileChildren(fiber, children);
 }
