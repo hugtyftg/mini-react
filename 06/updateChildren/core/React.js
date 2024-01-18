@@ -5,6 +5,8 @@ let wipRoot = null;
 let nextWorkOfUnit = null;
 // 更新时候需要删除的节点
 let deletions = [];
+// 当前活动更新的fiber，也就是一个fc
+let wipFiber = null;
 // 开启循环监听浏览器空闲时间
 requestIdleCallback(workLoop);
 // 主入口
@@ -19,13 +21,23 @@ function render(el, container) {
 }
 // 暂时只考虑没有dom的增删，只有props的变化
 function update() {
-  // 创建新root
-  wipRoot = {
-    dom: currentRoot.dom,
-    props: currentRoot.props,
-    alternate: currentRoot,
+  // 使用闭包暂时存储要改变的fiber
+  let currentFiber = wipFiber;
+  return () => {
+    console.log(currentFiber);
+    // // 创建新root
+    // wipRoot = {
+    //   dom: currentRoot.dom,
+    //   props: currentRoot.props,
+    //   alternate: currentRoot,
+    // };
+    // 更新开始的地方
+    wipRoot = {
+      ...currentFiber,
+      alternate: currentFiber,
+    };
+    nextWorkOfUnit = wipRoot;
   };
-  nextWorkOfUnit = wipRoot;
 }
 // 创建virtual dom
 function createElement(type, props, ...children) {
@@ -36,7 +48,7 @@ function createElement(type, props, ...children) {
       children: children.map((child) => {
         return /^(string|number)/.test(typeof child)
           ? createTextNode(child)
-          : child;
+          : child; // 如果是false的话，直接放在children数组里面
       }),
     },
   };
@@ -63,11 +75,17 @@ function workLoop(deadline) {
   let shouldYield = false;
   while (!shouldYield && nextWorkOfUnit) {
     nextWorkOfUnit = performWorkOfUnit(nextWorkOfUnit);
+
+    // 在更新阶段，wipRoot是更新的开始点，只需要判断下一个任务片是否是wipRoot的兄弟即可
+    // 如果是，则更新停止
+    // 需要考虑的是这些值可能为undefined，防止报错需要添加可选链
+    if (wipRoot?.sibling?.type === nextWorkOfUnit?.type) {
+      nextWorkOfUnit = undefined;
+    }
     shouldYield = deadline.timeRemaining() < 1;
   }
   if (wipRoot && !nextWorkOfUnit) {
     commitRoot();
-    console.log('finished');
   }
   requestIdleCallback(workLoop);
 }
@@ -96,7 +114,6 @@ function commitDeletion(fiber) {
 function commitWork(fiber) {
   // 终止条件
   if (!fiber) return;
-
   // 执行任务
   // 添加节点
   let fiberParent = fiber.parent;
@@ -141,6 +158,8 @@ function performWorkOfUnit(fiber) {
 }
 // 处理函数组件
 function handleFunctionComponent(fiber) {
+  // 存储将来要更新的FC fiber
+  wipFiber = fiber;
   const children = [fiber.type(fiber.props)];
   reconcileChildren(fiber, children);
 }
@@ -211,16 +230,18 @@ function reconcileChildren(fiber, children) {
         effectTag: 'update',
       };
     } else {
-      // add
-      newFiber = {
-        type: child.type,
-        props: child.props,
-        child: null,
-        parent: fiber,
-        sibling: null,
-        dom: null,
-        effectTag: 'placement',
-      };
+      if (child) {
+        // add
+        newFiber = {
+          type: child.type,
+          props: child.props,
+          child: null,
+          parent: fiber,
+          sibling: null,
+          dom: null,
+          effectTag: 'placement',
+        };
+      }
       // deletion
       if (oldFiberChild) {
         deletions.push(oldFiberChild);
@@ -230,14 +251,23 @@ function reconcileChildren(fiber, children) {
     if (oldFiberChild) {
       oldFiberChild = oldFiberChild.sibling;
     }
-
+    // 当前fiber指向新fiber
     if (index === 0) {
       fiber.child = newFiber;
     } else {
       prevChild.sibling = newFiber;
     }
-    prevChild = newFiber;
+    // 指针同步移动
+    // 如果child为false，则没有对应的fiber
+    if (newFiber) {
+      prevChild = newFiber;
+    }
   });
+  // 遍历一遍新DOM树之后再检查一遍，老的DOM树上是否还有fiber，如果有，说明这是老的children多余的若干个节点，需要移除
+  while (oldFiberChild) {
+    deletions.push(oldFiberChild);
+    oldFiberChild = oldFiberChild.sibling;
+  }
 }
 
 function handleSyntheticEvent(syntheticEventType) {
