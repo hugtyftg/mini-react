@@ -36,7 +36,7 @@ function createElement(type, props, ...children) {
       children: children.map((child) => {
         return /^(string|number)/.test(typeof child)
           ? createTextNode(child)
-          : child;
+          : child; // 如果是false的话，直接放在children数组里面
       }),
     },
   };
@@ -210,16 +210,18 @@ function reconcileChildren(fiber, children) {
         effectTag: 'update',
       };
     } else {
-      // add
-      newFiber = {
-        type: child.type,
-        props: child.props,
-        child: null,
-        parent: fiber,
-        sibling: null,
-        dom: null,
-        effectTag: 'placement',
-      };
+      if (child) {
+        // add
+        newFiber = {
+          type: child.type,
+          props: child.props,
+          child: null,
+          parent: fiber,
+          sibling: null,
+          dom: null,
+          effectTag: 'placement',
+        };
+      }
       // deletion
       if (oldFiberChild) {
         deletions.push(oldFiberChild);
@@ -229,13 +231,17 @@ function reconcileChildren(fiber, children) {
     if (oldFiberChild) {
       oldFiberChild = oldFiberChild.sibling;
     }
-
+    // 当前fiber指向新fiber
     if (index === 0) {
       fiber.child = newFiber;
     } else {
       prevChild.sibling = newFiber;
     }
-    prevChild = newFiber;
+    // 指针同步移动
+    // 如果child为false，则没有对应的fiber
+    if (newFiber) {
+      prevChild = newFiber;
+    }
   });
   // 遍历一遍新DOM树之后再检查一遍，老的DOM树上是否还有fiber，如果有，说明这是老的children多余的若干个节点，需要移除
   while (oldFiberChild) {
