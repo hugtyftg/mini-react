@@ -153,6 +153,9 @@ function performWorkOfUnit(fiber) {
 function handleFunctionComponent(fiber) {
   // 存储将来要更新的FC fiber
   wipFiber = fiber;
+  // 初始化当前fiber在当前闭包中的stateHooks和对应的index
+  stateHookIndex = 0;
+  stateHooks = [];
   const children = [fiber.type(fiber.props)];
   reconcileChildren(fiber, children);
 }
@@ -240,7 +243,7 @@ function reconcileChildren(fiber, children) {
         deletions.push(oldFiberChild);
       }
     }
-    // 更新阶段oldFiberChild
+    // 更新阶段才处理oldFiberChild
     if (oldFiberChild) {
       oldFiberChild = oldFiberChild.sibling;
     }
@@ -302,9 +305,40 @@ function handleSyntheticEvent(syntheticEventType) {
     );
   }
 }
+// 会在处理每个FC的时候赋初始值，而不是直接全局化为一张大的二维表
+let stateHooks;
+let stateHookIndex;
+function useState(initial) {
+  // 使用闭包暂时存储要改变的fiber，也就是这个useState所在的FC的fiber
+  let currentFiber = wipFiber;
+  // 通过alternate指针将两个闭包里面的fiber联系起来
+  let oldFiberHook = currentFiber.alternate?.stateHooks[stateHookIndex];
+  // 确定当前state
+  const stateHook = {
+    state: oldFiberHook ? oldFiberHook.state : initial,
+  };
+
+  currentFiber.stateHooks = stateHooks;
+
+  // 更新当前fiber的stateHooks
+  stateHooks.push(stateHook);
+  stateHookIndex++;
+
+  function setState(action) {
+    // 给wipRoot赋值，开启创建新fiber的流程
+    stateHook.state = action(stateHook.state);
+    wipRoot = {
+      ...currentFiber,
+      alternate: currentFiber,
+    };
+    nextWorkOfUnit = wipRoot;
+  }
+  return [stateHook.state, setState];
+}
 const React = {
   render,
   update,
+  useState,
   createElement,
 };
 export default React;
