@@ -316,7 +316,16 @@ function useState(initial) {
   // 确定当前state
   const stateHook = {
     state: oldFiberHook ? oldFiberHook.state : initial,
+    // 当前state的action更新队列
+    updateQueue: oldFiberHook ? oldFiberHook.updateQueue : [],
   };
+
+  // 批处理更新当前action的更新队列
+  stateHook.updateQueue.forEach((action) => {
+    stateHook.state = action(stateHook.state);
+  });
+  // 更新完毕之后应该重置更新队列，不然action会一直累积
+  stateHook.updateQueue = [];
 
   currentFiber.stateHooks = stateHooks;
 
@@ -325,8 +334,13 @@ function useState(initial) {
   stateHookIndex++;
 
   function setState(action) {
+    // stateHook.state = action(stateHook.state);
+    // 不应该咋setState里面更新state，而是应该在setState引起的下一次FC调用、生成闭包的时候，批处理更新函数
+    stateHook.updateQueue.push(
+      typeof action === 'function' ? action : () => action
+    ); // 支持传入值和传入函数
+
     // 给wipRoot赋值，开启创建新fiber的流程
-    stateHook.state = action(stateHook.state);
     wipRoot = {
       ...currentFiber,
       alternate: currentFiber,
