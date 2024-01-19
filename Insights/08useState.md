@@ -24,6 +24,8 @@ function useState(initial) {
 }
 ```
 
+## 实现 action 为函数的 useState
+
 但是这样做有一个问题，在初始渲染的时候调用了一次 useState，此时的 stateHook 值是 initial，setState 通过闭包拿到的 state 也是 initial
 
 在下一次调用 setXXX、requestIdleCallback 开始工作、更新视图的时候，会再次执行当前的 FC 组件，在再次调用 useState，但是 state 的值还是 initial，因此视图无法更新。
@@ -61,3 +63,20 @@ function useState(initial) {
 EC2 返回的 setXXX 函数等待下一次调用它的时刻，重复着修改 EC2 state -> 重新构建 fiber 链表 -> 处理 FC -> fiber.type(fiber.props) -> 执行 useState -> 返回 EC3 的 setXXX -> ... 循环往复
 
 一个 FC 存储多个 state
+
+如果只是用一个变量保存的话，前面的 state 会被后面的 state 覆盖，所以需要使用数组存储一个 FC 内的所有 state。由于一个应用里面有很多个 FC，每个 FC 有很多个 state，第一反应是直接在全局使用一个二维数组保存每个 n FC \* m state，但是，每个 FC 想知道的仅仅是它自身在之前的 state，而不关心其他 FC，并且我们已经通过了上面的机制拿到了每个 FC 对应的闭包，所以使用庞大的二维表是完全没有必要的，应该在全局声明 stateHooks 和 stateHookIndex 两个变量，在每个 FC 对应的 fiber 闭包中初始化赋值为[]和 0
+
+# useState 的批处理机制实现【异步更新队列】
+
+react 会将所有 action 收集起来，在某一个时机批量调用，调用完成之后才更新视图。视图只更新一次，提高更新效率
+
+## 支持直接传入新值而不是函数
+
+传入函数和传入值的区别就在于，更新的时候是调用函数还是直接使用值，根据 action 的 type 判断即可，对于值用一个函数包装
+
+```js
+// 支持传入值和传入函数
+stateHook.updateQueue.push(
+  typeof action === 'function' ? action : () => action
+);
+```
