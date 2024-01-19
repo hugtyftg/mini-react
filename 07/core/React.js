@@ -334,6 +334,12 @@ function useState(initial) {
   stateHookIndex++;
 
   function setState(action) {
+    // 提前浅比较检测是否需要更新，如果primitive value相等或者引用了同一段内存地址的reference type，则不进行更新
+    const eagerState =
+      typeof action === 'function' ? action(stateHook.state) : action;
+    if (Object.is(eagerState, stateHook.state)) {
+      return;
+    }
     // stateHook.state = action(stateHook.state);
     // 不应该咋setState里面更新state，而是应该在setState引起的下一次FC调用、生成闭包的时候，批处理更新函数
     stateHook.updateQueue.push(
