@@ -1,11 +1,12 @@
 import React from './core/React';
 let countFoo = 1;
 function Foo() {
+  console.log('foo');
   const [count, setCount] = React.useState(0);
   const [bar, setBar] = React.useState('bar');
   function handleClick() {
-    setCount((count) => count + 1);
-    setBar((bar) => bar + 'bar');
+    // setCount((count) => count + 1);
+    setBar((bar) => 'bar');
   }
   return (
     <div>
