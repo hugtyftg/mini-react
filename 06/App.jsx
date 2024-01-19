@@ -1,20 +1,16 @@
 import React from './core/React';
 let countFoo = 1;
-let showCount = false;
 function Foo() {
   console.log('foo run');
   const update = React.update();
   function handleClick() {
     countFoo++;
     update();
-    showCount = !showCount;
   }
   return (
     <div>
       <h1>Foo</h1>
       {countFoo}
-      {showCount && 1}
-
       <button onClick={handleClick}>click</button>
     </div>
   );
