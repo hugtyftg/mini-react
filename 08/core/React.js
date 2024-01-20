@@ -97,7 +97,7 @@ function commitRoot() {
 // 从当前wipFiber开始递归所有节点，如果有callback则执行
 // 逻辑类似commitRoot和commitWork
 function commitEffectHooks() {
-  function run(fiber) {
+  function runEffect(fiber) {
     // 出口
     if (!fiber) {
       return;
@@ -107,28 +107,46 @@ function commitEffectHooks() {
     if (!fiber.alternate) {
       // init，直接执行所有的副作用
       fiber.effectHooks?.forEach((effectHook) => {
-        effectHook?.callback();
+        effectHook.cleanup = effectHook?.callback();
       });
     } else {
       // update，deps发生变化的时候才执行副作用
       fiber.effectHooks?.forEach((hook, index) => {
-        // 有的fiber可能没有使用useEffect，没有effectHook属性，所以用可选链
-        const oldEffectHook = fiber.alternate?.effectHooks[index];
-        const curEffectHook = hook;
-        // deps数组内的item只要有一项发生变化，则开启副作用
-        const needUpdate = oldEffectHook?.deps.some((oldDep, i) => {
-          return oldDep !== curEffectHook?.deps[i];
-        });
-        if (needUpdate) {
-          curEffectHook.callback();
+        // 优化，如果deps是空数组，永远也不会触发update
+        if (hook.deps.length > 0) {
+          // 有的fiber可能没有使用useEffect，没有effectHook属性，所以用可选链
+          const oldEffectHook = fiber.alternate?.effectHooks[index];
+          const curEffectHook = hook;
+          // deps数组内的item只要有一项发生变化，则开启副作用
+          const needUpdate = oldEffectHook?.deps.some((oldDep, i) => {
+            return oldDep !== curEffectHook?.deps[i];
+          });
+          if (needUpdate) {
+            curEffectHook.cleanup = curEffectHook.callback();
+          }
         }
       });
     }
 
-    run(fiber.child);
-    run(fiber.sibling);
+    runEffect(fiber.child);
+    runEffect(fiber.sibling);
   }
-  run(wipFiber);
+  function runCleanup(fiber) {
+    if (!fiber) {
+      return;
+    }
+    fiber.alternate?.effectHooks?.forEach((hook) => {
+      if (hook.deps.length > 0) {
+        // 限制只有deps有值的时候才执行cleanup
+        hook.cleanup && hook.cleanup();
+      }
+    });
+    runCleanup(fiber.child);
+    runCleanup(fiber.sibling);
+  }
+  // 在更新发生时，先执行上一次调用effect得到的cleanup，再调用effect得到新的cleanup供下次使用
+  runCleanup(wipFiber);
+  runEffect(wipFiber);
 }
 function commitDeletion(fiber) {
   if (fiber.dom) {
@@ -401,6 +419,7 @@ function useEffect(callback, deps) {
   let effectHook = {
     callback,
     deps,
+    cleanup: undefined,
   };
   effectHooks.push(effectHook);
   wipFiber.effectHooks = effectHooks;

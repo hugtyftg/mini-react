@@ -1,3 +1,5 @@
+# useEffect
+
 ## 实现基本的 init 之后调用 effect
 
 useEffect 调用时机是 React 渲染真实 DOM 之后，并且浏览器完成重新绘制之前
@@ -133,3 +135,17 @@ if (!fiber.alternate) {
   });
 }
 ```
+
+# cleanup
+
+## 存储
+
+一个 FC 可能有多个 useEffect item，一个 useEffect item 应该存储其 callback deps 和 cleanup
+
+## 赋值
+
+effect 的调用结果
+
+## 调用时机
+
+在组件更新、创建完新的之后会先调用上一次调用 effect 产生的旧的 cleanup（minireact 限制，不调用 deps 为空的 cleanup），再调用 effect 产生新的 cleanup 供下次调用
