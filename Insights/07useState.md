@@ -1,8 +1,30 @@
-为什么不能在 if 语句里面使用 useState
+# 思考
+
+## useState 的优化点
+
+useState 在更新前执行的新旧状态比较类似 `Object.is`，而不能仅仅用 `==` 或者 `===` 判断：
+
+对于 primitive value：
+
+1. +0 和-0 认为是不同的 value，允许更新
+
+2. NaN 和 NaN 认为是相同的 value，不允许更新
+
+3. 其他 primitive 按值严格比较
+
+对于 reference type：
+
+1. 如果引用了同一段内存地址不进行更新
+
+2. 如果引用的变量在内存中属于不同的地址段，则认为新旧 state 不同允许更新
+
+## 为什么不能在 if 语句里面使用 useState
 
 因为 stateHook 在更新时取值是根据索引取的，如果有 if 语句，则在初始渲染或者更新的某些时候无法执行 useState，导致 state 和 index 无法一一对应
 
-useState 基本结构
+# 学习收获
+
+## useState 基本结构
 
 ```js
 function useState(initial) {
