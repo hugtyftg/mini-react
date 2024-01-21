@@ -84,7 +84,7 @@ function useState(initial) {
 
 EC2 返回的 setXXX 函数等待下一次调用它的时刻，重复着修改 EC2 state -> 重新构建 fiber 链表 -> 处理 FC -> fiber.type(fiber.props) -> 执行 useState -> 返回 EC3 的 setXXX -> ... 循环往复
 
-一个 FC 存储多个 state
+## 一个 FC 存储多个 state
 
 如果只是用一个变量保存的话，前面的 state 会被后面的 state 覆盖，所以需要使用数组存储一个 FC 内的所有 state。由于一个应用里面有很多个 FC，每个 FC 有很多个 state，第一反应是直接在全局使用一个二维数组保存每个 n FC \* m state，但是，每个 FC 想知道的仅仅是它自身在之前的 state，而不关心其他 FC，并且我们已经通过了上面的机制拿到了每个 FC 对应的闭包，所以使用庞大的二维表是完全没有必要的，应该在全局声明 stateHooks 和 stateHookIndex 两个变量，在每个 FC 对应的 fiber 闭包中初始化赋值为[]和 0
 

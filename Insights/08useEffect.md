@@ -140,7 +140,7 @@ if (!fiber.alternate) {
 
 ## 存储
 
-一个 FC 可能有多个 useEffect item，一个 useEffect item 应该存储其 callback deps 和 cleanup
+一个 FC fiber 应该使用数组存储内含的多个 useEffect item，而一个 useEffect item 应该存储其 callback deps 和 cleanup
 
 ## 赋值
 
