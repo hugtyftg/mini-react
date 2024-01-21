@@ -297,7 +297,7 @@ function reconcileChildren(fiber, children) {
           effectTag: 'placement',
         };
       }
-      // deletion
+      // 如果新旧节点类型不同且odlFiberChild不为空，说明是children等长的更新阶段
       if (oldFiberChild) {
         deletions.push(oldFiberChild);
       }
