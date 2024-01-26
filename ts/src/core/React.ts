@@ -2,8 +2,11 @@ import { Fiber, VNodeType, VirtualDOM } from './types';
 import { TEXT_ELEMENT } from './types/constants';
 // 当前正在活动的root working in progress
 let wipRoot: Fiber | null = null;
+// 传入performWorkOfUnit函数的工作单元
 let nextWorkOfUnit: Fiber | null = null;
-
+// fiber队列执行过程中“打的断点”，用于执行过程中标识跟踪FC fiber
+let wipFiber: Fiber | null = null;
+//
 function createTextNode(nodeValue: string | number): VirtualDOM {
   return {
     type: TEXT_ELEMENT,
@@ -62,7 +65,14 @@ function updateProps(dom: HTMLElement | Text, props: any) {
           (dom as HTMLElement).className = props.class;
           break;
         default:
-          dom[prop] = props[prop];
+          if (prop.startsWith('on')) {
+            // 合成事件绑定
+            const eventName: string = prop.slice(2).toLowerCase();
+            dom.addEventListener(eventName, props[prop]);
+          } else {
+            // 其他属性
+            dom[prop] = props[prop];
+          }
           break;
       }
     }
@@ -174,6 +184,7 @@ function commitWork(fiber: Fiber | null) {
   commitWork((fiber as Fiber).sibling);
 }
 requestIdleCallback(workLoop);
+
 const React = {
   createElement,
   render,

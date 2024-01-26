@@ -12,6 +12,13 @@ function Count({ num }: CountType) {
       }}
     >
       count:{num}
+      <button
+        onClick={() => {
+          console.log(11);
+        }}
+      >
+        click
+      </button>
     </div>
   );
 }
