@@ -69,9 +69,11 @@ function workLoop(deadline) {
   while (!shouldYield && nextWorkOfUnit) {
     nextWorkOfUnit = performWorkOfUnit(nextWorkOfUnit);
 
-    // 在更新阶段，wipRoot是更新的开始点
-    // 如果是，则更新停止
-    // 需要考虑的是这些值可能为undefined，防止报错需要添加可选链
+    // 某个FC内调用update函数触发针对该函数的更新，不涉及其他函数组件的重新计算
+    // wipFiber -> currentFiber -> wipRoot代表的FC fiber是更新的开始点，
+    // wipRoot的sibling FC fiber是当前更新的终点
+    // 如果下一个要执行的任务是本次更新的终点，将nextWorkOfUnit置空，结束创建新的fiber队列
+    // 需要考虑的是，对于初始化渲染阶段，wipRoot.sibling始终为空，因为root是这棵dom树的唯一的根，防止报错需要添加可选链
     if (wipRoot?.sibling?.type === nextWorkOfUnit?.type) {
       nextWorkOfUnit = undefined;
     }
