@@ -43,54 +43,110 @@ function render(el: VirtualDOM, container: HTMLElement) {
     parent: null,
     child: null,
     sibling: null,
+    alternate: null,
+    effectTag: 'placement',
   };
   nextWorkOfUnit = wipRoot;
+}
+// 更新
+function update() {
+  // update所在的FC fiber
+  let currentFiber: Fiber | null = wipFiber;
+  return () => {
+    // 从update所在的fiber开始更新
+    wipRoot = {
+      ...(currentFiber as Fiber),
+      alternate: currentFiber,
+    };
+    nextWorkOfUnit = wipRoot;
+  };
 }
 function createDOMNode(type: string): HTMLElement | Text {
   return type === TEXT_ELEMENT
     ? document.createTextNode('')
     : document.createElement(type);
 }
-function updateProps(dom: HTMLElement | Text, props: any) {
-  Object.keys(props).forEach((prop: string) => {
-    if (prop !== 'children') {
-      switch (prop) {
-        case 'style':
-          const styleObj = props.style;
-          Object.keys(styleObj).forEach((styleKey) => {
+// 更新props
+function updateProps(dom: HTMLElement | Text, nextProps: any, prevProps: any) {
+  // 3中情况：
+  // 1.旧有，新无
+  // 2.旧无，新有
+  // 3.旧有，新有，值不同
+  // 其中后两种可以归结为同一种情况，分别遍历一次新旧props即可（旧无也就是取值结果是undefined）
+  Object.keys(prevProps).forEach((prevPropKey: string) => {
+    if (prevPropKey !== 'children') {
+      if (!(prevPropKey in nextProps)) {
+        (dom as HTMLElement).removeAttribute(prevPropKey);
+      }
+    }
+  });
+  Object.keys(nextProps).forEach((nextPropKey: string) => {
+    if (nextPropKey !== 'children') {
+      if (nextProps[nextPropKey] !== prevProps[nextPropKey]) {
+        if (nextPropKey === 'style') {
+          const styleObj = nextProps.style;
+          Object.keys(styleObj).forEach((styleKey: string) => {
             (dom as HTMLElement).style[styleKey] = styleObj[styleKey];
           });
-          break;
-        case 'class':
-          (dom as HTMLElement).className = props.class;
-          break;
-        default:
-          if (prop.startsWith('on')) {
-            // 合成事件绑定
-            const eventName: string = prop.slice(2).toLowerCase();
-            dom.addEventListener(eventName, props[prop]);
-          } else {
-            // 其他属性
-            dom[prop] = props[prop];
-          }
-          break;
+        } else if (nextPropKey.startsWith('on')) {
+          const eventName: string = nextPropKey.slice(2).toLowerCase();
+          (dom as HTMLElement).removeEventListener(
+            eventName,
+            prevProps[nextPropKey]
+          );
+          (dom as HTMLElement).addEventListener(
+            eventName,
+            nextProps[nextPropKey]
+          );
+        } else {
+          dom[nextPropKey] = nextProps[nextPropKey];
+        }
       }
     }
   });
 }
-function initChildren(fiber: Fiber | null, children: Array<VirtualDOM>) {
+function reconcileChildren(fiber: Fiber, children: Array<VirtualDOM>) {
+  // 当前fiber对应的oldFiber的第一个child，在更新阶段为新旧child建立alternate关系
+  let oldFiberChild: Fiber | null | undefined = fiber.alternate?.child;
   // 当目前处理的child不是fiber的第一个孩子时，借助这个指针将上一个child与当前child建立sibling关系
   let prevChildFiber: null | Fiber = null;
   children.forEach((child: VirtualDOM, index: number) => {
-    let newFiber: Fiber = {
-      type: child.type,
-      props: child.props,
-      dom: null,
-      parent: fiber,
-      child: null,
-      sibling: null,
-    };
-    //
+    let newFiber: Fiber | null;
+    // 根据旧child fiber是否存在以及存在时新旧类型对比，区分三种情况：
+    // 1.更新，dom结构没有变化，仅仅是prop变化
+    // 2.初始化，新建fiber和dom
+    // 3.更新，dom结构发生变化。又分为两种情况：children等数量和不等数量，即fiber链等长和不等长
+    // 使用effectTag标记当前fiber用于初始化渲染还是更新阶段，在统一提交阶段分情况处理
+    if (oldFiberChild && oldFiberChild.type === child.type) {
+      // 仅prop更新
+      newFiber = {
+        type: child.type,
+        props: child.props,
+        parent: fiber,
+        child: null,
+        sibling: null,
+        dom: oldFiberChild.dom,
+        alternate: oldFiberChild,
+        effectTag: 'update',
+      };
+    } else {
+      // 初始化
+      // child可能为false，此时不应该显示内容
+      if (child) {
+        newFiber = {
+          type: child.type,
+          props: child.props,
+          parent: fiber,
+          child: null,
+          sibling: null,
+          dom: null,
+          alternate: null,
+          effectTag: 'placement',
+        };
+      } else {
+        newFiber = null;
+      }
+    }
     if (index === 0) {
       (fiber as Fiber).child = newFiber;
     } else {
@@ -98,7 +154,14 @@ function initChildren(fiber: Fiber | null, children: Array<VirtualDOM>) {
     }
     // 指针向下移动，使得第2、3、4等child可以和前一个child建立sibling关系
     // 在所有children处理完毕之后，prevChildFiber指向最后一个child fiber
-    prevChildFiber = newFiber;
+    // child可能为false，此时newFiber为null，prevChildFiber没有必要移动到flase 对应的null fiber
+    if (newFiber) {
+      prevChildFiber = newFiber;
+    }
+    // 对于更新阶段，oldFiberChild也要向下迭代
+    if (oldFiberChild) {
+      oldFiberChild = oldFiberChild.sibling;
+    }
   });
 }
 function workLoop(deadline: any) {
@@ -111,7 +174,6 @@ function workLoop(deadline: any) {
   // 任务提交完毕时统一提交 一次 ，执行以后就把wipRoot复原
   if (!nextWorkOfUnit && wipRoot) {
     commitRoot();
-    wipRoot = null;
   }
   requestIdleCallback(workLoop);
 }
@@ -119,15 +181,17 @@ function workLoop(deadline: any) {
 function handleHostComponent(fiber: Fiber) {
   if (!fiber.dom) {
     fiber.dom = createDOMNode(fiber.type as string);
-    updateProps(fiber.dom, fiber.props);
+    updateProps(fiber.dom, fiber.props, {});
   }
   // 处理children，并且添加child -> sibling ->
-  initChildren(fiber, fiber.props.children);
+  reconcileChildren(fiber, fiber.props.children);
 }
 // 函数组件无需创建dom，只需要递归处理children
 function handleFunctionComponent(fiber: Fiber) {
+  // wipFiber实时指向FC
+  wipFiber = fiber;
   // 处理children，并且添加child -> sibling ->
-  initChildren(fiber, [(fiber.type as Function)(fiber.props)]);
+  reconcileChildren(fiber, [(fiber.type as Function)(fiber.props)]);
 }
 // 执行fiber
 function performWorkOfUnit(fiber: Fiber | null) {
@@ -172,12 +236,19 @@ function commitWork(fiber: Fiber | null) {
   // 支持FC后需要考虑两个问题
   // 1.fiber.parent为FC，没有dom——一直向上找dom挂载
   // 2.fiber为FC，没有dom——跳过挂载，直接处理child
+  // 需要考虑两个阶段：初始化和更新
   if (fiber.dom) {
     let fiberParent: Fiber = fiber.parent as Fiber;
     while (!fiberParent.dom) {
       fiberParent = fiberParent.parent as Fiber;
     }
-    fiberParent.dom.appendChild(fiber.dom);
+    if (fiber.effectTag === 'update') {
+      // 更新props
+      updateProps(fiber.dom, fiber.props, fiber.alternate?.props);
+    } else {
+      // 初始化
+      fiberParent.dom.appendChild(fiber.dom);
+    }
   }
   // 递
   commitWork((fiber as Fiber).child);
@@ -188,5 +259,6 @@ requestIdleCallback(workLoop);
 const React = {
   createElement,
   render,
+  update,
 };
 export default React;

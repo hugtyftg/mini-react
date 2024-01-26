@@ -1,8 +1,8 @@
 import React from './core/React';
-type CountType = {
-  num: number;
-};
-function Count({ num }: CountType) {
+let num = 10;
+let showFoo = true;
+function Count() {
+  const update = React.update();
   return (
     <div
       className="count"
@@ -14,7 +14,8 @@ function Count({ num }: CountType) {
       count:{num}
       <button
         onClick={() => {
-          console.log(11);
+          num++;
+          update();
         }}
       >
         click
@@ -22,21 +23,25 @@ function Count({ num }: CountType) {
     </div>
   );
 }
-const App = (
-  <div id="app">
-    <h1
-      style={{
-        color: 'white',
-        backgroundColor: 'lightblue',
-        textAlign: 'center',
-        fontSize: '50px',
-      }}
-    >
-      mini react
-    </h1>
-    <p style={{ textAlign: 'center', fontSize: '20px' }}>typescript version</p>
-    <Count num={10} />
-  </div>
-);
+function App() {
+  return (
+    <div id="app">
+      <h1
+        style={{
+          color: 'white',
+          backgroundColor: 'lightblue',
+          textAlign: 'center',
+          fontSize: '50px',
+        }}
+      >
+        mini react
+      </h1>
+      <p style={{ textAlign: 'center', fontSize: '20px' }}>
+        typescript version
+      </p>
+      <Count />
+    </div>
+  );
+}
 
 export default App;
