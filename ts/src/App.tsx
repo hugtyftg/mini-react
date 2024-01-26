@@ -1,7 +1,8 @@
 import React from './core/React';
 let num = 10;
-let showFoo = true;
 function Count() {
+  console.log('count');
+
   const update = React.update();
   return (
     <div
@@ -23,7 +24,12 @@ function Count() {
     </div>
   );
 }
+function Foo() {
+  console.log('foo');
+  return <div className="foo">foo component</div>;
+}
 function App() {
+  console.log('app');
   return (
     <div id="app">
       <h1
@@ -40,6 +46,7 @@ function App() {
         typescript version
       </p>
       <Count />
+      <Foo />
     </div>
   );
 }
