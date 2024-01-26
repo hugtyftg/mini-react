@@ -83,6 +83,7 @@ function workLoop(deadline) {
   requestIdleCallback(workLoop);
 }
 function commitRoot() {
+  // 更新时删除多余dom
   deletions.forEach(commitDeletion);
   commitWork(wipRoot.child);
   // 统一提交之后开启副作用
@@ -132,9 +133,11 @@ function commitEffectHooks() {
     runEffect(fiber.sibling);
   }
   function runCleanup(fiber) {
+    // 出口
     if (!fiber) {
       return;
     }
+    // 递归执行cleanup
     fiber.alternate?.effectHooks?.forEach((hook) => {
       if (hook.deps.length > 0) {
         // 限制只有deps有值的时候才执行cleanup
@@ -144,6 +147,7 @@ function commitEffectHooks() {
     runCleanup(fiber.child);
     runCleanup(fiber.sibling);
   }
+  // 在初始化渲染时，进入runCleanup之后，无论递归进行到哪里，alternate始终为空，因此相当于没有执行runCleanup
   // 在更新发生时，先执行上一次调用effect得到的cleanup，再调用effect得到新的cleanup供下次使用
   runCleanup(wipFiber);
   runEffect(wipFiber);
@@ -439,6 +443,7 @@ function useRef(initial) {
   };
   // 给wipFiber添加ref属性
   currentFiber.refHooks = refHooks;
+  // 增加ref值
   refHooks.push(refHook);
   refHookIndex++;
   return refHook;
