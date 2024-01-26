@@ -2,8 +2,11 @@ import { Fiber, VNodeType, VirtualDOM } from './types';
 import { TEXT_ELEMENT } from './types/constants';
 // 当前正在活动的root working in progress
 let wipRoot: Fiber | null = null;
+// 传入performWorkOfUnit函数的工作单元
 let nextWorkOfUnit: Fiber | null = null;
-
+// fiber队列执行过程中“打的断点”，用于执行过程中标识跟踪FC fiber
+let wipFiber: Fiber | null = null;
+//
 function createTextNode(nodeValue: string | number): VirtualDOM {
   return {
     type: TEXT_ELEMENT,
@@ -62,7 +65,14 @@ function updateProps(dom: HTMLElement | Text, props: any) {
           (dom as HTMLElement).className = props.class;
           break;
         default:
-          dom[prop] = props[prop];
+          if (prop.startsWith('on')) {
+            // 合成事件绑定
+            const eventName: string = prop.slice(2).toLowerCase();
+            dom.addEventListener(eventName, props[prop]);
+          } else {
+            // 其他属性
+            dom[prop] = props[prop];
+          }
           break;
       }
     }
@@ -80,11 +90,14 @@ function initChildren(fiber: Fiber | null, children: Array<VirtualDOM>) {
       child: null,
       sibling: null,
     };
+    //
     if (index === 0) {
       (fiber as Fiber).child = newFiber;
     } else {
       (prevChildFiber as Fiber).sibling = newFiber;
     }
+    // 指针向下移动，使得第2、3、4等child可以和前一个child建立sibling关系
+    // 在所有children处理完毕之后，prevChildFiber指向最后一个child fiber
     prevChildFiber = newFiber;
   });
 }
@@ -97,37 +110,51 @@ function workLoop(deadline: any) {
   }
   // 任务提交完毕时统一提交 一次 ，执行以后就把wipRoot复原
   if (!nextWorkOfUnit && wipRoot) {
-    console.log('commit');
-
     commitRoot();
     wipRoot = null;
   }
   requestIdleCallback(workLoop);
 }
-// 执行fiber
-function performWorkOfUnit(fiber: Fiber | null) {
-  // 1.创建dom（除去container fiber有dom）
-  // 2.添加props
-  if (fiber && !fiber.dom) {
-    fiber.dom = createDOMNode(fiber.type);
+// 普通组件在没有dom的时候需要创建dom和更新props，并且迭代处理children
+function handleHostComponent(fiber: Fiber) {
+  if (!fiber.dom) {
+    fiber.dom = createDOMNode(fiber.type as string);
     updateProps(fiber.dom, fiber.props);
   }
-  // 3.处理children，并且添加child -> sibling ->
-  initChildren(fiber, (fiber as Fiber).props.children);
-  // 4.返回下一个
-  // 有child优先返回child
-  if ((fiber as Fiber).child) {
-    return (fiber as Fiber).child;
-  }
-  // 没有child则返回sibling
-  // 没有sibling则返回叔叔
-  // 如果当前进入的层级过深，需要向上找祖父甚至曾祖父的兄弟
-  let nextFiber = fiber;
-  while (nextFiber) {
-    if (nextFiber.sibling) {
-      return nextFiber.sibling;
+  // 处理children，并且添加child -> sibling ->
+  initChildren(fiber, fiber.props.children);
+}
+// 函数组件无需创建dom，只需要递归处理children
+function handleFunctionComponent(fiber: Fiber) {
+  // 处理children，并且添加child -> sibling ->
+  initChildren(fiber, [(fiber.type as Function)(fiber.props)]);
+}
+// 执行fiber
+function performWorkOfUnit(fiber: Fiber | null) {
+  // 要处理的fiber不应该为空，为空的时候直接返回null
+  if (fiber) {
+    if (typeof fiber.type === 'string') {
+      handleHostComponent(fiber);
+    } else {
+      handleFunctionComponent(fiber);
     }
-    nextFiber = nextFiber.parent;
+    if (fiber.child) {
+      return fiber.child;
+    }
+    // 4.返回下一个
+    // 有child优先返回child
+    // 没有child则返回sibling
+    // 没有sibling则返回叔叔
+    // 如果当前进入的层级过深，需要向上找祖父甚至曾祖父的兄弟
+    let nextFiber: Fiber | null = fiber;
+    // 1.创建dom（除去container fiber有dom）
+    // 2.添加props
+    while (nextFiber) {
+      if (nextFiber.sibling) {
+        return nextFiber.sibling;
+      }
+      nextFiber = nextFiber.parent;
+    }
   }
   // 如果任务已经执行完毕，即使向上一直找，也最终会停在root fiber，其parent为null，跳出循环，返回null终止工作
   return null;
@@ -141,8 +168,6 @@ function commitWork(fiber: Fiber | null) {
   if (!fiber) {
     return;
   }
-  console.log(fiber);
-
   // 任务 挂载
   // 支持FC后需要考虑两个问题
   // 1.fiber.parent为FC，没有dom——一直向上找dom挂载
@@ -152,13 +177,14 @@ function commitWork(fiber: Fiber | null) {
     while (!fiberParent.dom) {
       fiberParent = fiberParent.parent as Fiber;
     }
-    fiber.parent?.dom?.appendChild(fiber.dom);
+    fiberParent.dom.appendChild(fiber.dom);
   }
   // 递
   commitWork((fiber as Fiber).child);
   commitWork((fiber as Fiber).sibling);
 }
 requestIdleCallback(workLoop);
+
 const React = {
   createElement,
   render,

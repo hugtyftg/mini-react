@@ -1,5 +1,4 @@
-import { TextNodeType } from './constants';
-type VNodeType = string | TextNodeType;
+type VNodeType = string | Function; // 元素节点 文本节点 或者 函数组件
 interface VirtualDOM {
   type: VNodeType;
   props: {
