@@ -1,5 +1,7 @@
 import React from './core/React';
 let num = 10;
+let showNum: boolean = false;
+let showComponent: boolean = false;
 function Count() {
   console.log('count');
 
@@ -12,10 +14,11 @@ function Count() {
         textAlign: 'center',
       }}
     >
-      count:{num}
+      count:{showNum && num}
       <button
         onClick={() => {
           num++;
+          showNum = !showNum;
           update();
         }}
       >
@@ -25,11 +28,14 @@ function Count() {
   );
 }
 function Foo() {
-  console.log('foo');
   return <div className="foo">foo component</div>;
+}
+function Bar() {
+  return <div className="bar">bar component</div>;
 }
 function App() {
   console.log('app');
+  const update = React.update();
   return (
     <div id="app">
       <h1
@@ -45,8 +51,26 @@ function App() {
       <p style={{ textAlign: 'center', fontSize: '20px' }}>
         typescript version
       </p>
-      <Count />
-      <Foo />
+      <div
+        className="sub-components"
+        style={{
+          textAlign: 'center',
+        }}
+      >
+        {showComponent && <Foo />}
+        {showComponent && <Bar />}
+        {'aa'}
+      </div>
+
+      <button
+        onClick={() => {
+          showComponent = !showComponent;
+          update();
+        }}
+      >
+        show two components
+      </button>
+      {/* <Count /> */}
     </div>
   );
 }
