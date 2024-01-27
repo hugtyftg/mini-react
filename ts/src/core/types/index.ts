@@ -14,6 +14,6 @@ interface Fiber extends VirtualDOM {
   child: null | Fiber; // 初始创建出fiber还没处理的时候，child为空
   sibling: null | Fiber; // 初始创建出fiber还没处理的时候，child为空
   alternate: null | Fiber; // 初始化阶段创建的fiber没有alternate
-  effectTag: 'update' | 'placement'; // 标记当前fiber用于初始化渲染还是更新阶段，在统一提交阶段处理
+  effectTag: 'update' | 'placement'; // 标记当前fiber用于初始化渲染还是更新阶段，在统一提交阶段分情况处理
 }
 export type { VNodeType, VirtualDOM, Fiber };

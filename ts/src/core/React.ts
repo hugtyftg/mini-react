@@ -6,7 +6,8 @@ let wipRoot: Fiber | null = null;
 let nextWorkOfUnit: Fiber | null = null;
 // fiber队列执行过程中“打的断点”，用于执行过程中标识跟踪FC fiber
 let wipFiber: Fiber | null = null;
-//
+// 在统一提交挂载dom之前，先把更新后没有的fiber dom统一删除
+let deletions: Fiber[] = [];
 function createTextNode(nodeValue: string | number): VirtualDOM {
   return {
     type: TEXT_ELEMENT,
@@ -112,18 +113,21 @@ function reconcileChildren(fiber: Fiber, children: Array<VirtualDOM>) {
   let prevChildFiber: null | Fiber = null;
   children.forEach((child: VirtualDOM, index: number) => {
     let newFiber: Fiber | null;
+    const isSameType = oldFiberChild && child.type === oldFiberChild?.type;
+
     // 根据旧child fiber是否存在以及存在时新旧类型对比，区分三种情况：
     // 1.更新，dom结构没有变化，仅仅是prop变化
     // 2.初始化，新建fiber和dom
     // 3.更新，dom结构发生变化。又分为两种情况：children等数量和不等数量，即fiber链等长和不等长
     // 使用effectTag标记当前fiber用于初始化渲染还是更新阶段，在统一提交阶段分情况处理
-    if (oldFiberChild && oldFiberChild.type === child.type) {
-      // 仅prop更新
+    if (isSameType) {
+      // 仅prop更新，oldFiberChild一定不为空
+      if (!oldFiberChild) return;
       newFiber = {
         type: child.type,
         props: child.props,
-        parent: fiber,
         child: null,
+        parent: fiber,
         sibling: null,
         dom: oldFiberChild.dom,
         alternate: oldFiberChild,
@@ -131,26 +135,42 @@ function reconcileChildren(fiber: Fiber, children: Array<VirtualDOM>) {
       };
     } else {
       // 初始化
-      // child可能为false，此时不应该显示内容
       if (child) {
         newFiber = {
           type: child.type,
           props: child.props,
-          parent: fiber,
           child: null,
+          parent: fiber,
           sibling: null,
           dom: null,
           alternate: null,
           effectTag: 'placement',
         };
       } else {
+        // child可能为false，此时不应该显示内容
         newFiber = null;
       }
+      // 如果前后类型不同并且oldFiberChild不为空，说明不是初始化阶段，而是有dom变化的更新
+      if (oldFiberChild) {
+        deletions.push(oldFiberChild);
+      }
     }
-    if (index === 0) {
-      (fiber as Fiber).child = newFiber;
+    // 对于更新阶段，oldFiberChild也要向下迭代
+    if (oldFiberChild) {
+      oldFiberChild = oldFiberChild.sibling;
+    }
+    // 没有false时，index为0标识为child
+    // 如果本身index不为0并且index 0元素为false，那么就需要判断prevChildFiber是否为null
+    if (index === 0 || !prevChildFiber) {
+      fiber.child = newFiber;
     } else {
-      (prevChildFiber as Fiber).sibling = newFiber;
+      // index为0时为空
+      // 连续的几个child都为false时
+      // 由于后面几行给prevChildFiber赋值前考虑newFiber是否为空（即当前处理的child是否为false）
+      // 因此prevChild会一直为空，导致null.sibling报错，因此需要判断prevChildFiber是否为空
+      if (prevChildFiber) {
+        prevChildFiber.sibling = newFiber;
+      }
     }
     // 指针向下移动，使得第2、3、4等child可以和前一个child建立sibling关系
     // 在所有children处理完毕之后，prevChildFiber指向最后一个child fiber
@@ -158,11 +178,12 @@ function reconcileChildren(fiber: Fiber, children: Array<VirtualDOM>) {
     if (newFiber) {
       prevChildFiber = newFiber;
     }
-    // 对于更新阶段，oldFiberChild也要向下迭代
-    if (oldFiberChild) {
-      oldFiberChild = oldFiberChild.sibling;
-    }
   });
+  // 遍历一遍新DOM树之后再检查一遍，老的DOM树上是否还有fiber，如果有，说明这是老的children多余的若干个节点，需要移除
+  while (oldFiberChild) {
+    deletions.push(oldFiberChild);
+    oldFiberChild = oldFiberChild.sibling;
+  }
 }
 function workLoop(deadline: any) {
   let shouldYield = false;
@@ -197,10 +218,12 @@ function handleHostComponent(fiber: Fiber) {
 }
 // 函数组件无需创建dom，只需要递归处理children
 function handleFunctionComponent(fiber: Fiber) {
+  if (typeof fiber.type !== 'function') return;
   // wipFiber实时指向FC
   wipFiber = fiber;
-  // 处理children，并且添加child -> sibling ->
-  reconcileChildren(fiber, [(fiber.type as Function)(fiber.props)]);
+  const children: Fiber[] = [fiber.type(fiber.props)];
+  // 处理children，并且添加child -> sibling -> uncle
+  reconcileChildren(fiber, children);
 }
 // 执行fiber
 function performWorkOfUnit(fiber: Fiber | null) {
@@ -233,8 +256,16 @@ function performWorkOfUnit(fiber: Fiber | null) {
   return null;
 }
 function commitRoot() {
+  // 把更新后没有的fiber dom统一删除
+  deletions.forEach(commitDeletion);
+  // 统一提交挂载dom
   commitWork((wipRoot as Fiber).child);
+  // 重置当前活动的fiber
   wipRoot = null;
+  // 重置需要删除的fiber
+  // 没有清空的话会导致在之后的更新时仍然执行之前更新需要删除的fiber dom，
+  // 但是这个fiber dom很可能已经不挂载在原来的parentFiber.dom上了，因此会在remove时报错
+  deletions = [];
 }
 function commitWork(fiber: Fiber | null) {
   // 出口
@@ -262,6 +293,21 @@ function commitWork(fiber: Fiber | null) {
   // 递
   commitWork((fiber as Fiber).child);
   commitWork((fiber as Fiber).sibling);
+}
+// 在统一提交挂载dom之前，先把更新后没有的fiber dom统一删除
+function commitDeletion(fiber: Fiber) {
+  if (fiber.dom) {
+    // fiber.parent可能为FC fiber没有dom，应该向上查找祖父等
+    let parentFiber: Fiber | null = fiber.parent;
+    while (!parentFiber?.dom) {
+      parentFiber = (parentFiber as Fiber).parent;
+    }
+
+    parentFiber.dom.removeChild(fiber.dom);
+  } else {
+    // fiber为FC fiber没有dom，应该删除child fiber dom
+    commitDeletion(fiber.child as Fiber);
+  }
 }
 requestIdleCallback(workLoop);
 
