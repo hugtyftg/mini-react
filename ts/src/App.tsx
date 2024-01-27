@@ -3,17 +3,21 @@ let showComponent: boolean = false;
 function Count() {
   // 只更新一次，批处理机制
   console.log('count');
-
+  // 惰性初始化
   const [num, setNum] = React.useState(() => 0);
   const [str, setStr] = React.useState('str');
+  // const ref = React.useRef(true);
   function clickHandler() {
-    setNum((num: number) => num + 1);
-    setNum((num: number) => num + 1);
-    setNum((num: number) => num + 1);
+    // setNum((num: number) => num + 1);
+    // setNum((num: number) => num + 1);
+    // setNum((num: number) => num + 1);
+    // 异步批处理+闭包
     setStr((str: string) => str + 'str');
-    // setNum(num + 1);
-    // setNum(num + 1);
-    // setNum(num + 1);
+    setNum(num + 1);
+    setNum(num + 1);
+    setNum(num + 1);
+    // ref.current的改变不引起视图的重新渲染
+    // ref.current = false;
   }
   return (
     <div

@@ -1,4 +1,4 @@
-import { Fiber, StateHook, VNodeType, VirtualDOM } from './types';
+import { Fiber, RefHook, StateHook, VNodeType, VirtualDOM } from './types';
 import { TEXT_ELEMENT } from './types/constants';
 // 当前正在活动的root working in progress
 let wipRoot: Fiber | null = null;
@@ -12,6 +12,10 @@ let deletions: Fiber[] = [];
 let stateHooks: StateHook<any>[];
 // 标识某个state在其fiber state hooks所处的索引位置
 let stateHookIndex: number;
+// 某个fiber的所有ref hooks
+let refHooks: RefHook<any>[];
+// 标识某个state在其fiber ref hooks所处的索引位置
+let refHookIndex: number;
 // 开启循环监听浏览器空闲，穿插执行fiber
 requestIdleCallback(workLoop);
 
@@ -231,6 +235,9 @@ function handleFunctionComponent(fiber: Fiber) {
   // 初始化该fiber的state相关的变量
   stateHooks = [];
   stateHookIndex = 0;
+  // 初始化该fiber的ref相关的变量
+  refHooks = [];
+  refHookIndex = 0;
   const children: Fiber[] = [fiber.type(fiber.props)];
   // 处理children，并且添加child -> sibling -> uncle
   reconcileChildren(fiber, children);
@@ -365,10 +372,23 @@ function useState(initial: Function | any) {
   }
   return [stateHook.state, setState];
 }
+function useRef(initial: any) {
+  let currentFiber: Fiber = wipFiber as Fiber;
+  let oldFiberRefHook: RefHook<any> | undefined =
+    currentFiber.alternate?.refHooks![refHookIndex];
+  let refHook: RefHook<any> = {
+    current: oldFiberRefHook ? oldFiberRefHook.current : initial,
+  };
+  refHooks.push(refHook);
+  refHookIndex++;
+  currentFiber.refHooks = refHooks;
+  return refHook;
+}
 const React = {
   createElement,
   render,
   update,
   useState,
+  useRef,
 };
 export default React;

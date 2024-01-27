@@ -16,9 +16,13 @@ interface Fiber extends VirtualDOM {
   alternate: null | Fiber; // 初始化阶段创建的fiber没有alternate
   effectTag: 'update' | 'placement'; // 标记当前fiber用于初始化渲染还是更新阶段，在统一提交阶段分情况处理
   stateHooks?: StateHook<any>[];
+  refHooks?: RefHook<any>[];
 }
 interface StateHook<T> {
   state: T;
   updateQueue: Array<() => T>;
 }
-export type { VNodeType, VirtualDOM, Fiber, StateHook };
+interface RefHook<T> {
+  current: T;
+}
+export type { VNodeType, VirtualDOM, Fiber, StateHook, RefHook };
