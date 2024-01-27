@@ -1,4 +1,4 @@
-import { Fiber, VNodeType, VirtualDOM } from './types';
+import { Fiber, StateHook, VNodeType, VirtualDOM } from './types';
 import { TEXT_ELEMENT } from './types/constants';
 // 当前正在活动的root working in progress
 let wipRoot: Fiber | null = null;
@@ -8,6 +8,13 @@ let nextWorkOfUnit: Fiber | null = null;
 let wipFiber: Fiber | null = null;
 // 在统一提交挂载dom之前，先把更新后没有的fiber dom统一删除
 let deletions: Fiber[] = [];
+// 某个fiber的所有state hooks
+let stateHooks: StateHook<any>[];
+// 标识某个state在其fiber state hooks所处的索引位置
+let stateHookIndex: number;
+// 开启循环监听浏览器空闲，穿插执行fiber
+requestIdleCallback(workLoop);
+
 function createTextNode(nodeValue: string | number): VirtualDOM {
   return {
     type: TEXT_ELEMENT,
@@ -221,6 +228,9 @@ function handleFunctionComponent(fiber: Fiber) {
   if (typeof fiber.type !== 'function') return;
   // wipFiber实时指向FC
   wipFiber = fiber;
+  // 初始化该fiber的state相关的变量
+  stateHooks = [];
+  stateHookIndex = 0;
   const children: Fiber[] = [fiber.type(fiber.props)];
   // 处理children，并且添加child -> sibling -> uncle
   reconcileChildren(fiber, children);
@@ -309,11 +319,56 @@ function commitDeletion(fiber: Fiber) {
     commitDeletion(fiber.child as Fiber);
   }
 }
-requestIdleCallback(workLoop);
-
+function useState(initial: Function | any) {
+  // 当前useState所在的FC fiber
+  const currentFiber: Fiber = wipFiber as Fiber;
+  // 当前FC fiber的alternate的对应stateHook
+  const oldFiberHook: StateHook<any> | undefined =
+    currentFiber.alternate?.stateHooks![stateHookIndex];
+  // 处理当前的stateHook
+  const stateHook: StateHook<any> = {
+    state: oldFiberHook
+      ? oldFiberHook.state
+      : typeof initial === 'function'
+      ? initial()
+      : initial,
+    updateQueue: oldFiberHook ? oldFiberHook.updateQueue : [],
+  };
+  // 批处理更新，可以发现action为值和为函数的区别
+  stateHook.updateQueue.forEach((action: Function) => {
+    stateHook.state = action(stateHook.state);
+  });
+  // 更新完毕之后应该重置更新队列，不然action会一直累积
+  stateHook.updateQueue = [];
+  // 更新当前fiber的stateHooks
+  stateHooks.push(stateHook);
+  stateHookIndex++;
+  // 给当前新创建出来的fiber重置stateHooks
+  currentFiber.stateHooks = stateHooks;
+  function setState(action: Function | any) {
+    // 浅比较
+    const eagerState =
+      typeof action === 'function' ? action(stateHook.state) : action;
+    if (Object.is(eagerState, stateHook.state)) {
+      return;
+    }
+    // 当前stateHook存储action
+    stateHook.updateQueue.push(
+      typeof action === 'function' ? action : () => action
+    );
+    // 开启更新
+    wipRoot = {
+      ...currentFiber,
+      alternate: currentFiber,
+    };
+    nextWorkOfUnit = wipRoot;
+  }
+  return [stateHook.state, setState];
+}
 const React = {
   createElement,
   render,
   update,
+  useState,
 };
 export default React;
