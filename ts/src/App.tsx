@@ -1,11 +1,20 @@
 import React from './core/React';
-let num = 10;
-let showNum: boolean = false;
 let showComponent: boolean = false;
 function Count() {
+  // 只更新一次，批处理机制
   console.log('count');
 
-  const update = React.update();
+  const [num, setNum] = React.useState(() => 0);
+  const [str, setStr] = React.useState('str');
+  function clickHandler() {
+    setNum((num: number) => num + 1);
+    setNum((num: number) => num + 1);
+    setNum((num: number) => num + 1);
+    setStr((str: string) => str + 'str');
+    // setNum(num + 1);
+    // setNum(num + 1);
+    // setNum(num + 1);
+  }
   return (
     <div
       className="count"
@@ -14,16 +23,11 @@ function Count() {
         textAlign: 'center',
       }}
     >
-      count:{showNum && num}
-      <button
-        onClick={() => {
-          num++;
-          showNum = !showNum;
-          update();
-        }}
-      >
-        click
-      </button>
+      count:{num}
+      <br />
+      str:{str}
+      <br />
+      <button onClick={clickHandler}>click</button>
     </div>
   );
 }
@@ -70,7 +74,7 @@ function App() {
       >
         show two components
       </button>
-      {/* <Count /> */}
+      <Count />
     </div>
   );
 }
