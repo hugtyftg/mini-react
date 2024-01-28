@@ -2,7 +2,7 @@ import React from './core/React';
 let showComponent: boolean = false;
 function Count() {
   // 只更新一次，批处理机制
-  console.log('count');
+  console.log('count component');
   // 惰性初始化
   const [num, setNum] = React.useState(() => 0);
   const [str, setStr] = React.useState('str');
@@ -19,6 +19,18 @@ function Count() {
     // ref.current的改变不引起视图的重新渲染
     // ref.current = false;
   }
+  React.useEffect(() => {
+    console.log('init effect');
+    return () => {
+      console.log('cleanup 1');
+    };
+  }, []);
+  React.useEffect(() => {
+    console.log('num update effect');
+    return () => {
+      console.log('cleanup 2');
+    };
+  }, [num]);
   return (
     <div
       className="count"
@@ -42,7 +54,7 @@ function Bar() {
   return <div className="bar">bar component</div>;
 }
 function App() {
-  console.log('app');
+  console.log('app component');
   const update = React.update();
   return (
     <div id="app">
