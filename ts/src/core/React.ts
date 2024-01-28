@@ -1,4 +1,11 @@
-import { Fiber, RefHook, StateHook, VNodeType, VirtualDOM } from './types';
+import {
+  EffectHook,
+  Fiber,
+  RefHook,
+  StateHook,
+  VNodeType,
+  VirtualDOM,
+} from './types';
 import { TEXT_ELEMENT } from './types/constants';
 // 当前正在活动的root working in progress
 let wipRoot: Fiber | null = null;
@@ -16,9 +23,11 @@ let stateHookIndex: number;
 let refHooks: RefHook<any>[];
 // 标识某个state在其fiber ref hooks所处的索引位置
 let refHookIndex: number;
+// 某个fiber的所有effect hooks
+let effectHooks: EffectHook<any>[];
 // 开启循环监听浏览器空闲，穿插执行fiber
 requestIdleCallback(workLoop);
-
+// 创建文本节点的virtual dom
 function createTextNode(nodeValue: string | number): VirtualDOM {
   return {
     type: TEXT_ELEMENT,
@@ -28,6 +37,7 @@ function createTextNode(nodeValue: string | number): VirtualDOM {
     },
   };
 }
+// 创建元素节点的virtual dom
 function createElement(
   type: VNodeType,
   props: any,
@@ -45,6 +55,7 @@ function createElement(
     },
   };
 }
+// 赋予nextWorkOfUnit，开启fiber构建流程
 function render(el: VirtualDOM, container: HTMLElement) {
   wipRoot = {
     type: el.type,
@@ -60,6 +71,12 @@ function render(el: VirtualDOM, container: HTMLElement) {
   };
   nextWorkOfUnit = wipRoot;
 }
+// 创建真实DOM
+function createDOMNode(type: string): HTMLElement | Text {
+  return type === TEXT_ELEMENT
+    ? document.createTextNode('')
+    : document.createElement(type);
+}
 // 更新
 function update() {
   // update所在的FC fiber
@@ -73,11 +90,7 @@ function update() {
     nextWorkOfUnit = wipRoot;
   };
 }
-function createDOMNode(type: string): HTMLElement | Text {
-  return type === TEXT_ELEMENT
-    ? document.createTextNode('')
-    : document.createElement(type);
-}
+
 // 更新props
 function updateProps(dom: HTMLElement | Text, nextProps: any, prevProps: any) {
   // 3中情况：
@@ -117,6 +130,7 @@ function updateProps(dom: HTMLElement | Text, nextProps: any, prevProps: any) {
     }
   });
 }
+// 递归处理children，建立child -> sibling -> uncle关系以及新旧fiber之间的alternate关系
 function reconcileChildren(fiber: Fiber, children: Array<VirtualDOM>) {
   // 当前fiber对应的oldFiber的第一个child，在更新阶段为新旧child建立alternate关系
   let oldFiberChild: Fiber | null | undefined = fiber.alternate?.child;
@@ -196,6 +210,7 @@ function reconcileChildren(fiber: Fiber, children: Array<VirtualDOM>) {
     oldFiberChild = oldFiberChild.sibling;
   }
 }
+// 循环执行任务队列
 function workLoop(deadline: any) {
   let shouldYield = false;
   // 有剩余时间并且还有需要执行的任务时，循环处理任务
@@ -238,6 +253,8 @@ function handleFunctionComponent(fiber: Fiber) {
   // 初始化该fiber的ref相关的变量
   refHooks = [];
   refHookIndex = 0;
+  // 初始化该fiber的ref相关的变量
+  effectHooks = [];
   const children: Fiber[] = [fiber.type(fiber.props)];
   // 处理children，并且添加child -> sibling -> uncle
   reconcileChildren(fiber, children);
@@ -272,9 +289,14 @@ function performWorkOfUnit(fiber: Fiber | null) {
   // 如果任务已经执行完毕，即使向上一直找，也最终会停在root fiber，其parent为null，跳出循环，返回null终止工作
   return null;
 }
+// 统一提交
 function commitRoot() {
   // 把更新后没有的fiber dom统一删除
   deletions.forEach(commitDeletion);
+  // 更新阶段，旧组件卸载、新组件fiber任务队列创建完成、新DOM创建完成，但是还没有统一提交渲染的时候，执行旧fiber的cleanup
+  commitCleanup(wipRoot);
+  // 真实DOM创建完毕后执行副作用，浏览器没有完成绘制，不阻塞浏览器绘制
+  commitEffect(wipRoot);
   // 统一提交挂载dom
   commitWork((wipRoot as Fiber).child);
   // 重置当前活动的fiber
@@ -326,6 +348,61 @@ function commitDeletion(fiber: Fiber) {
     commitDeletion(fiber.child as Fiber);
   }
 }
+// effect的执行时机是真实dom渲染完成后、浏览器没有完成绘制之前
+function commitEffect(fiber: Fiber | null) {
+  // 出口
+  if (!fiber) {
+    return;
+  }
+  // 执行effect的actions，分为初始化阶段和更新阶段
+  // 初始化阶段全部执行，更新阶段如果deps有值发生变化时执行
+  let oldFiber: Fiber | null = fiber.alternate;
+  const curFiberEffectHooks = fiber.effectHooks;
+  if (!oldFiber) {
+    // 初始化阶段
+    curFiberEffectHooks?.forEach((effectHook: EffectHook<any>) => {
+      effectHook.cleanup = effectHook.action();
+    });
+  } else {
+    // 更新阶段
+    const oldFiberEffectHooks = oldFiber.effectHooks;
+    curFiberEffectHooks?.forEach(
+      (effectHook: EffectHook<any>, index: number) => {
+        const curDeps: any[] = effectHook.deps;
+        const oldDeps: any[] = oldFiberEffectHooks![index].deps;
+        const needUpdate: boolean = curDeps.some((curDep: any, i: number) => {
+          return curDep !== oldDeps[i];
+        });
+        if (needUpdate) {
+          effectHook.cleanup = effectHook.action();
+        }
+      }
+    );
+  }
+  // 递
+  commitEffect(fiber.child);
+  commitEffect(fiber.sibling);
+}
+// effect cleanup的执行时机是更新开始之前，旧组件即将销毁
+// 在mini-react中可以将该场景理解为，新的闭包和fiber已经执行创建完毕，
+// 新的effect执行之前、新的统一提交挂载dom执行之前
+// 执行旧的fiber上挂载的若干个cleanup
+function commitCleanup(fiber: Fiber | null) {
+  // 出口
+  if (!fiber) {
+    return;
+  }
+  // 执行任务
+  let oldFiber: Fiber | null = fiber.alternate;
+  if (oldFiber) {
+    oldFiber.effectHooks?.forEach((effectHook: EffectHook<any>) => {
+      effectHook.cleanup && effectHook.cleanup();
+    });
+  }
+  // 递
+  commitCleanup(fiber.child);
+  commitCleanup(fiber.sibling);
+}
 function useState(initial: Function | any) {
   // 当前useState所在的FC fiber
   const currentFiber: Fiber = wipFiber as Fiber;
@@ -352,6 +429,10 @@ function useState(initial: Function | any) {
   stateHookIndex++;
   // 给当前新创建出来的fiber重置stateHooks
   currentFiber.stateHooks = stateHooks;
+  // 不能写成，因为setState赋值wipRoot时，直接解构currentFiber没有处理stateHooks
+  // if (!currentFiber.stateHooks) {
+  // currentFiber.stateHooks = stateHooks;
+  // }
   function setState(action: Function | any) {
     // 浅比较
     const eagerState =
@@ -373,16 +454,37 @@ function useState(initial: Function | any) {
   return [stateHook.state, setState];
 }
 function useRef(initial: any) {
+  // 当前useState所在的FC fiber
   let currentFiber: Fiber = wipFiber as Fiber;
+  // 当前FC fiber的alternate的对应stateHook
   let oldFiberRefHook: RefHook<any> | undefined =
     currentFiber.alternate?.refHooks![refHookIndex];
+  // 处理当前的refHook
   let refHook: RefHook<any> = {
     current: oldFiberRefHook ? oldFiberRefHook.current : initial,
   };
+
   refHooks.push(refHook);
   refHookIndex++;
-  currentFiber.refHooks = refHooks;
+  // 挂载到fiber上
+  if (!currentFiber.refHooks) {
+    currentFiber.refHooks = refHooks;
+  }
   return refHook;
+}
+function useEffect(action: Function, deps: any[]) {
+  // 当前useEffecg所在的FC fiber
+  let currentFiber: Fiber = wipFiber as Fiber;
+  // useEffect在当前fiber中创建的effectHook
+  let effectHook: EffectHook<any> = {
+    action,
+    deps,
+    cleanup: undefined,
+  };
+  // 把当前的effectHook添加到FC fiber的effectHooks中
+  effectHooks.push(effectHook);
+  // 重载
+  currentFiber.effectHooks = effectHooks;
 }
 const React = {
   createElement,
@@ -390,5 +492,6 @@ const React = {
   update,
   useState,
   useRef,
+  useEffect,
 };
 export default React;

@@ -17,6 +17,7 @@ interface Fiber extends VirtualDOM {
   effectTag: 'update' | 'placement'; // 标记当前fiber用于初始化渲染还是更新阶段，在统一提交阶段分情况处理
   stateHooks?: StateHook<any>[];
   refHooks?: RefHook<any>[];
+  effectHooks?: EffectHook<any>[];
 }
 interface StateHook<T> {
   state: T;
@@ -25,4 +26,9 @@ interface StateHook<T> {
 interface RefHook<T> {
   current: T;
 }
-export type { VNodeType, VirtualDOM, Fiber, StateHook, RefHook };
+interface EffectHook<T> {
+  action: Function;
+  deps: T[];
+  cleanup: Function | undefined;
+}
+export type { VNodeType, VirtualDOM, Fiber, StateHook, RefHook, EffectHook };
