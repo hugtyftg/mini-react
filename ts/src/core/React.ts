@@ -531,6 +531,10 @@ function useMemo<T, K>(callback: () => T, deps: K[]): T {
   memoHooksIndex++;
   return memoHook.memorizedValue;
 }
+function useCallback<T, K>(callback: T, deps: K[]) {
+  // https://react.docschina.org/reference/react/useCallback#how-is-usecallback-related-to-usememo
+  return useMemo(() => callback, deps);
+}
 const React = {
   createElement,
   render,
@@ -539,5 +543,6 @@ const React = {
   useRef,
   useEffect,
   useMemo,
+  useCallback,
 };
 export default React;
