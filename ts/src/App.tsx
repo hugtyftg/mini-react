@@ -7,18 +7,18 @@ function Count() {
   const [num, setNum] = React.useState(() => 0);
   const [str, setStr] = React.useState('str');
   // const ref = React.useRef(true);
-  function clickHandler() {
-    // setNum((num: number) => num + 1);
-    // setNum((num: number) => num + 1);
-    // setNum((num: number) => num + 1);
-    // 异步批处理+闭包
-    setStr((str: string) => str + 'str');
-    setNum(num + 1);
-    setNum(num + 1);
-    setNum(num + 1);
-    // ref.current的改变不引起视图的重新渲染
-    // ref.current = false;
-  }
+  // function clickHandler() {
+  //   // setNum((num: number) => num + 1);
+  //   // setNum((num: number) => num + 1);
+  //   // setNum((num: number) => num + 1);
+  //   // 异步批处理+闭包
+  //   setStr((str: string) => str + 'str');
+  //   setNum(num + 1);
+  //   setNum(num + 1);
+  //   setNum(num + 1);
+  //   // ref.current的改变不引起视图的重新渲染
+  //   // ref.current = false;
+  // }
   React.useEffect(() => {
     console.log('init effect');
     return () => {
@@ -31,42 +31,99 @@ function Count() {
       console.log('cleanup 2');
     };
   }, [num]);
+  const memoValue = React.useMemo(() => {
+    return num + 1;
+  }, [num]);
+  console.log(memoValue);
+
   return (
     <div
       className="count"
       style={{
-        fontStyle: 'italic',
+        width: '300px',
+        height: '300px',
+        backgroundColor: 'pink',
         textAlign: 'center',
+        border: '1px solid black',
+        margin: '30px auto',
       }}
     >
+      <h2>Count Component</h2>
       count:{num}
       <br />
       str:{str}
       <br />
-      <button onClick={clickHandler}>click</button>
+      {/* <button onClick={clickHandler}>click</button> */}
+      <button
+        onClick={() => {
+          setNum(num + 1);
+        }}
+      >
+        change num
+      </button>
+      <button
+        onClick={() => {
+          setStr((str: string) => str + 'str');
+        }}
+      >
+        change str
+      </button>
+      <p>memorized value: {memoValue}</p>
     </div>
   );
 }
 function Foo() {
-  return <div className="foo">foo component</div>;
+  return (
+    <div
+      className="foo"
+      style={{
+        width: '300px',
+        backgroundColor: 'lightgray',
+        textAlign: 'center',
+        border: '1px solid black',
+        margin: '10px auto',
+      }}
+    >
+      foo component
+    </div>
+  );
 }
 function Bar() {
-  return <div className="bar">bar component</div>;
+  return (
+    <div
+      className="bar"
+      style={{
+        width: '300px',
+        backgroundColor: 'lightgreen',
+        textAlign: 'center',
+        border: '1px solid black',
+        margin: '10px auto',
+      }}
+    >
+      bar component
+    </div>
+  );
 }
 function App() {
   console.log('app component');
   const update = React.update();
   return (
-    <div id="app">
+    <div
+      id="app"
+      style={{
+        textAlign: 'center',
+        backgroundColor: 'lightblue',
+        border: '1px solid black',
+      }}
+    >
       <h1
         style={{
           color: 'white',
-          backgroundColor: 'lightblue',
           textAlign: 'center',
           fontSize: '50px',
         }}
       >
-        mini react
+        App Component
       </h1>
       <p style={{ textAlign: 'center', fontSize: '20px' }}>
         typescript version
