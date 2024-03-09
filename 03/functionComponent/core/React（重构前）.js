@@ -45,7 +45,7 @@ function workLoop(idleDeadline) {
 function performWorkOfUnit(fiber) {
   // 1.根据类型选择是否创建节点、创建怎样的节点
   // 2.设置props
-  // 判断是否为函数组件，fiber.type结果是一个
+  // 判断是否为函数组件，fiber.type结果是一个函数
   const isFunctionComponent = typeof fiber.type === 'function';
   // 对于非函数组件才创建dom节点，但是这会造成一个问题，函数组件里面的dom会找不到parent.dom
   if (!isFunctionComponent) {

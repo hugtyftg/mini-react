@@ -48,6 +48,8 @@ const React = {
 };
 export default React;
 function renderPlus(el, container) {
+  console.log(el);
+
   // 根据type创建dom
   const dom =
     el.type === 'TEXT_ELEMENT'
@@ -66,7 +68,7 @@ function renderPlus(el, container) {
       // 递归处理children
       case 'children':
         el.props.children.forEach((child) => {
-          render(child, dom);
+          renderPlus(child, dom);
         });
         break;
       // 其他属性直接添加即可

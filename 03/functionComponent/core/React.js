@@ -63,6 +63,7 @@ function commitRoot() {
 function commitWork(fiber) {
   // 终止条件
   if (!fiber) return;
+
   // 执行任务——添加节点
   let fiberParent = fiber.parent;
   // 对于非函数组件，一直向上找dom挂载

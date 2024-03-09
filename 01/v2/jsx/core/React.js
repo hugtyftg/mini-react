@@ -23,6 +23,7 @@ function createElement(type, props, ...children) {
   };
 }
 function render(el, container) {
+  console.log(el);
   // 根据type创建dom
   const dom =
     el.type === 'TEXT_ELEMENT'
