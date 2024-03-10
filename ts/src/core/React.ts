@@ -540,8 +540,8 @@ const React = {
   render,
   update,
   useState,
-  useRef,
   useEffect,
+  useRef,
   useMemo,
   useCallback,
 };
