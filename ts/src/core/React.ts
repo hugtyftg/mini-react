@@ -1,6 +1,7 @@
 import {
   EffectHook,
   Fiber,
+  MemoHook,
   RefHook,
   StateHook,
   VNodeType,
@@ -25,6 +26,10 @@ let refHooks: RefHook<any>[];
 let refHookIndex: number;
 // 某个fiber的所有effect hooks
 let effectHooks: EffectHook<any>[];
+// 某个fiber的所有memo hooks
+let memoHooks: MemoHook<any, any>[];
+// 标识某个memo hook在其fiber memo hooks所处的索引位置（从上到下执行function component的时候会遇到很多个useMemo，是有顺序的）
+let memoHooksIndex: number;
 // 开启循环监听浏览器空闲，穿插执行fiber
 requestIdleCallback(workLoop);
 // 创建文本节点的virtual dom
@@ -255,6 +260,9 @@ function handleFunctionComponent(fiber: Fiber) {
   refHookIndex = 0;
   // 初始化该fiber的ref相关的变量
   effectHooks = [];
+  // 初始化该fiber的memo相关的变量
+  memoHooks = [];
+  memoHooksIndex = 0;
   const children: Fiber[] = [fiber.type(fiber.props)];
   // 处理children，并且添加child -> sibling -> uncle
   reconcileChildren(fiber, children);
@@ -371,7 +379,7 @@ function commitEffect(fiber: Fiber | null) {
         const curDeps: any[] = effectHook.deps;
         const oldDeps: any[] = oldFiberEffectHooks![index].deps;
         const needUpdate: boolean = curDeps.some((curDep: any, i: number) => {
-          return curDep !== oldDeps[i];
+          return !Object.is(curDep, oldDeps[i]);
         });
         if (needUpdate) {
           effectHook.cleanup = effectHook.action();
@@ -486,6 +494,47 @@ function useEffect(action: Function, deps: any[]) {
   // 重载
   currentFiber.effectHooks = effectHooks;
 }
+
+function useMemo<T, K>(callback: () => T, deps: K[]): T {
+  // 当前useEffecg所在的FC fiber
+  let currentFiber: Fiber = wipFiber as Fiber;
+  let oldMemoHook: MemoHook<T, K> | undefined =
+    currentFiber.alternate?.memoHooks![memoHooksIndex];
+  let memoHook: MemoHook<T, K>;
+  if (oldMemoHook) {
+    // update
+    // 任意一个依赖项的值发生变化都要重新计算缓存值
+    const needUpdate: boolean = deps.some((dep: K, index: number) => {
+      return !Object.is(dep, oldMemoHook?.deps[index]);
+    });
+    if (needUpdate) {
+      memoHook = {
+        memorizedValue: callback(),
+        deps,
+      };
+    } else {
+      memoHook = {
+        memorizedValue: oldMemoHook.memorizedValue,
+        deps,
+      };
+    }
+  } else {
+    // init
+    memoHook = {
+      memorizedValue: callback(),
+      deps,
+    };
+  }
+  // 挂载到当前的新fiber上
+  currentFiber.memoHooks = memoHooks;
+  memoHooks.push(memoHook);
+  memoHooksIndex++;
+  return memoHook.memorizedValue;
+}
+function useCallback<T, K>(callback: T, deps: K[]) {
+  // https://react.docschina.org/reference/react/useCallback#how-is-usecallback-related-to-usememo
+  return useMemo(() => callback, deps);
+}
 const React = {
   createElement,
   render,
@@ -493,5 +542,7 @@ const React = {
   useState,
   useRef,
   useEffect,
+  useMemo,
+  useCallback,
 };
 export default React;

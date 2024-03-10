@@ -120,7 +120,7 @@ function commitEffectHooks() {
           const curEffectHook = hook;
           // deps数组内的item只要有一项发生变化，则开启副作用
           const needUpdate = oldEffectHook?.deps.some((oldDep, i) => {
-            return oldDep !== curEffectHook?.deps[i];
+            return !Object.is(oldDep, curEffectHook?.deps[i]);
           });
           if (needUpdate) {
             curEffectHook.cleanup = curEffectHook.callback();
@@ -461,7 +461,7 @@ function useMemo(callback, deps) {
   if (oldMemoHook) {
     // update
     const needUpdate = deps.some((dep, index) => {
-      return dep !== oldMemoHook.deps[index]
+      return !Object.is(dep, oldMemoHook.deps[index])
     })
     if (needUpdate) {
       // deps发生变化，需要更新成新的运算值

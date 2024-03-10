@@ -18,6 +18,7 @@ interface Fiber extends VirtualDOM {
   stateHooks?: StateHook<any>[];
   refHooks?: RefHook<any>[];
   effectHooks?: EffectHook<any>[];
+  memoHooks?: MemoHook<any, any>[];
 }
 interface StateHook<T> {
   state: T;
@@ -31,4 +32,16 @@ interface EffectHook<T> {
   deps: T[];
   cleanup: Function | undefined;
 }
-export type { VNodeType, VirtualDOM, Fiber, StateHook, RefHook, EffectHook };
+interface MemoHook<T, K> {
+  memorizedValue: T;
+  deps: K[];
+}
+export type {
+  VNodeType,
+  VirtualDOM,
+  Fiber,
+  StateHook,
+  RefHook,
+  EffectHook,
+  MemoHook,
+};

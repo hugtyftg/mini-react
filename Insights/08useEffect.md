@@ -58,7 +58,7 @@ function commitEffect() {
       const curEffectHook = fiber?.effectHook;
       // deps数组内的item只要有一项发生变化，则开启副作用
       const needUpdate = oldEffectHook?.deps.some((oldDep, index) => {
-        return oldDep !== curEffectHook?.deps[index];
+        return !Object.is(oldDep,curEffectHook?.deps[index];)
       });
       if (needUpdate) {
         curEffectHook.callback();
@@ -127,7 +127,7 @@ if (!fiber.alternate) {
     const curEffectHook = hook;
     // deps数组内的item只要有一项发生变化，则开启副作用
     const needUpdate = oldEffectHook?.deps.some((oldDep, i) => {
-      return oldDep !== curEffectHook?.deps[i];
+      return !Object.is(oldDep, curEffectHook?.deps[i]);
     });
     if (needUpdate) {
       curEffectHook.callback();
