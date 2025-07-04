@@ -258,7 +258,7 @@ function handleFunctionComponent(fiber: Fiber) {
   // 初始化该fiber的ref相关的变量
   refHooks = [];
   refHookIndex = 0;
-  // 初始化该fiber的ref相关的变量
+  // 初始化该fiber的effect相关的变量
   effectHooks = [];
   // 初始化该fiber的memo相关的变量
   memoHooks = [];
